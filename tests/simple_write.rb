@@ -4,32 +4,31 @@
 # Copyright © 2008-2009, Ian Levesque. All Rights Reserved.
 # ian@ephemeronindustries.com
 #
-# Redistribution and use in source and binary forms, with or without modification, 
+# Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
-# 
+#
 # - Redistributions of source code must retain the above copyright notice, this list
 #   of conditions and the following disclaimer.
-# - Redistributions in binary form must reproduce the above copyright notice, this list 
-#   of conditions and the following disclaimer in the documentation and/or other materials 
+# - Redistributions in binary form must reproduce the above copyright notice, this list
+#   of conditions and the following disclaimer in the documentation and/or other materials
 #   provided with the distribution.
 # - Neither the name of the Ephemeron Industries nor the names of its contributors may be
-#   used to endorse or promote products derived from this software without specific prior 
+#   used to endorse or promote products derived from this software without specific prior
 #   written permission.
 #
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY 
-# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
-# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
-# THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+# THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
 # SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
-# OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
-# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR 
-# TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, 
+# OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+# TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 require 'test/unit'
 require 'rubytahoe'
 
-TahoeServer = "http://testgrid.allmydata.org:3567/"
 TahoeRootWriteCap = "URI:DIR2:ufut6px6n764nvk2beejmox3py:qapbsyr6264puzv62l4nwpeqcec4uel2mgzmsv22ws54rofhr7ja"
 
 # fill in your username, password, and valid Root URI to test the Root URI retrieval code
@@ -40,34 +39,34 @@ AllMyDataURI = ""
 class TestRubyTahoe < Test::Unit::TestCase
   def setup
     @client = RubyTahoe.new(TahoeServer, TahoeRootWriteCap)
-    
+
     empty_directory
   end
-  
+
   def teardown
     empty_directory
     @client = nil
   end
-  
+
   # clean out the test directory on the tahoe server
   def empty_directory
     items = @client.list_directory("/")
     items.each { |key|
       @client.delete("/" + key)
     }
-    
+
     items = @client.list_directory("/")
     assert_equal(0, items.length)
   end
-  
+
   def test_allmydata_auth
     root_uri = RubyTahoe.get_allmydata_root_uri(AllMyDataUsername, AllMyDataPassword)
     assert_equal(AllMyDataURI, root_uri)
-    
+
     root_uri = RubyTahoe.get_allmydata_root_uri(AllMyDataUsername, AllMyDataPassword + "laksjflkajsdf")
     assert_nil(root_uri)
   end
-  
+
   def test_file
     contents = "Leroy was here at #{Time.new.to_s}"
 
@@ -152,15 +151,15 @@ class TestRubyTahoe < Test::Unit::TestCase
     @client.delete("/test_deleting_directory/subdir2/")
     @client.delete("/test_deleting_directory/file1.txt")
 
-    # verify the listing    
+    # verify the listing
     items = @client.list_directory("/test_deleting_directory/")
     expected_items = ["subdir1/", "subdir3/", "file2.txt"]
-    
+
     items.each { |key|
       assert_not_nil(expected_items.delete(key))
     }
     assert_equal(0, expected_items.length)
-    
+
     # check that we got the file in the subdirectory
     assert_raise(NotFoundError) {
       assert_not_equal("leroy was here", @client.get_file("/test_deleting_directory/subdir2/file1.txt"))
@@ -242,25 +241,25 @@ class TestRubyTahoe < Test::Unit::TestCase
     items = @client.list_directory(dirpath)
     items.each { |key| assert_not_nil(expected_items.delete(key)) }
     assert_equal(0, expected_items.length)
-  end 
-  
+  end
+
   def test_delete_missing
     assert_raise(NotFoundError) {
       @client.delete("/totally bogus folder")
     }
-  end    
-  
+  end
+
   def test_get_missing
     assert_raise(NotFoundError) {
       @client.get_file("/totally bogus file")
     }
   end
-  
+
   def test_list_missing
     assert_raise(NotFoundError) {
       @client.list_directory("/totally bogus folder/")
     }
-    
+
     assert_nothing_thrown {
       @client.list_paths_starting_with("/totally bogus folder/")
     }

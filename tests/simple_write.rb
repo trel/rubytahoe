@@ -265,3 +265,5 @@ class TestRubyTahoe < Test::Unit::TestCase
     }
   end
 end
+
+# vim:softtabstop=2:shiftwidth=2

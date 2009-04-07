@@ -52,7 +52,8 @@ class String
   end
 end
 
-class RubyTahoe
+module RubyTahoe
+
   def self.get_allmydata_root_uri(email, password)
     http = Net::HTTP.new("www.allmydata.com", 443)
     http.use_ssl = true
@@ -68,176 +69,266 @@ class RubyTahoe
     end
   end
 
-  attr_reader :root_uri
-
-  def initialize(server_url, root_uri)
-    @server_url = server_url
-    parsed_uri = URI.parse(@server_url)
-    @server_url.chop! while @server_url.end_with?("/")
-    @server_port = parsed_uri.port
-    @server_host = parsed_uri.host
-    @root_uri = root_uri
+  def self.new *args
+    Object.new *args
   end
 
-  def put_file(path, contents)
-    url = build_path_url(path)
-    put_file_url(url, contents)
-  end
+  class Object
 
-  def put_file_url(url, contents)
-    fileid = nil
-    Net::HTTP.start(@server_host, @server_port) do |http|
-      headers = {'Content-Type' => 'application/octet-stream'}
-      response = http.send_request('PUT', url, contents, headers)
-      response.value
+    # The read/write cap
+    attr_reader :rw_cap
 
-      fileid = response.body
+    # The readonly cap
+    attr_reader :ro_cap
+
+    # The repair cap
+    attr_reader :repair_cap
+
+    #
+    # Returns true when the object is readable (i.e. it has a read cap)
+    #
+    def readable?
+      not @ro_cap.nil?
     end
 
-    fileid
-  end
+    #
+    # Returns true when the object is writeable (i.e. it has a write cap)
+    #
+    def writeable?
+      not @rw_cap.nil?
+    end
 
-  def get_file(path)
-    get_file_url(build_path_url(path))
-  end
+    #
+    # Returns true when the file is a directory or a mutable file.
+    #
+    def mutable?
+      @mutable
+    end
 
-  def get_file_url(url)
-    res = Net::HTTP.start(@server_host, @server_port) {|http|
-      http.get(url)
-    }
-    raise NotFoundError if res.code == "404"
-    raise NotFoundError if res.code == "301"
-    raise NotFoundError if res.code == "300"
-    res.value
-    res.body
-  end
+    #
+    # Returns true when the file is an immutable file.
+    #
+    def immutable
+      not @mutable
+    end
 
-  def build_path_url(path)
-    url = "/uri/" + @root_uri + URI.escape(path)
-    # singlify any double slashes
-    url.sub(/\/\//, '/')
-  end
+    #
+    # Returns the cap for the file with the highest permission (read/write cap
+    # > readonly cap > repair cap).
+    #
+    def cap
+      return @rw_cap unless @rw_cap.nil?
+      return @ro_cap unless @ro_cap.nil?
+      @repair_cap
+    end
 
-  def mkdir(path)
-    realpath = (path.end_with?("/") ? path.chop : path)
-    url = @server_url + build_path_url(realpath)
-    res = Net::HTTP.post_form(URI.parse(url), {"t" => "mkdir"})
-    raise ArgumentError.new("Directory exists") if res.code == "400"
-    res.value
-    res.body
-  end
+    alias :root_uri :cap
 
-  def list_directory(path)
-    url = build_path_url(path)
-    list_directory_url(url)
-  end
-
-  def list_directory_url(url)
-    res = Net::HTTP.start(@server_host, @server_port) {|http|
-      http.get("#{url}?t=json")
-    }
-    raise NotFoundError if res.code == "404"
-    res.value
-    json_info = res.body
-
-    directory_info = JSON.parse(json_info)
-
-    raise ArgumentError.new("Not a directory") unless directory_info[0] == "dirnode"
-
-    entries = []
-
-    directory_info[1]["children"].each_key { |filename|
-      if directory_info[1]["children"][filename][0] == "dirnode"
-        entries << (filename + "/")
-      else
-        entries << filename
+    #
+    # Returns a new instance of RubyTahoe::File or RubyTahoe::Directory,
+    # depending on the given cap.
+    #
+    def self.new server_url, cap
+      server_url = URI.parse server_url unless server_url.is_a? URI::HTTP
+      data = Net::HTTP.start(server_url.host, server_url.port) do |http|
+        response, data = http.get "/uri/#{cap}?t=json"
+        raise NotFoundError unless response.code == "200"
+        data
       end
-    }
-
-    entries
-  end
-
-  def delete(path)
-    url = build_path_url(path)
-
-    Net::HTTP.start(@server_host, @server_port) do |http|
-      response = http.send_request('DELETE', url)
-      raise NotFoundError if response.code == "404"
-      raise NotFoundError if response.code == "301"
-      raise NotFoundError if response.code == "300"
-      response.value
-    end
-  end
-
-  # this adds a new hardlink and removes the old one
-  def rename(oldpath, newpath)
-    # make sure you're not renaming a parent directory underneath itself
-    raise ArgumentError.new("Cannot rename a parent into a child of itself") if newpath.start_with?(oldpath) && newpath[oldpath.length-1] == 47 #'/'
-
-    # get the old cap URI
-    url = build_path_url(oldpath)
-    res = Net::HTTP.start(@server_host, @server_port) {|http|
-      http.get(url + "?t=json")
-    }
-    res.value
-
-    info = JSON.parse(res.body)
-    if info[0] == "dirnode"
-      cap = info[1]["rw_uri"]
-    else
-      cap = info[1]["ro_uri"]
+      data = JSON.parse(data)
+      return self.from_json server_url, data
     end
 
-    url = build_path_url(newpath)
-    url.chop! while url.end_with?("/")
-
-    # add the new link
-    Net::HTTP.start(@server_host, @server_port) do |http|
-      headers = {'Content-Type' => 'text/plain'}
-      response = http.send_request('PUT', url + "?t=uri", cap, headers)
-      response.value # you get a 500 server error if you try to destructively rename over a directory
+    #
+    # Returns a new instance of RubyTahoe::File or RubyTahoe::Directory from
+    # parsed JSON data.
+    #
+    def self.from_json server_url, data
+      object = if data[0] == "dirnode"
+        Directory.allocate
+      else
+        File.allocate
+      end
+      object.send :initialize, server_url, data[1]
+      object
     end
 
-    # then remove the old
-    delete(oldpath)
+    def initialize server_url, data
+      @server_url = server_url
+      @rw_cap = data["rw_uri"]
+      @ro_cap = data["ro_uri"]
+      @repair_cap = data["repair_cap"]
+      @mutable = data["mutable"]
+    end
+
   end
 
-  def get_size(path)
-    url = build_path_url(path)
-    res = Net::HTTP.start(@server_host, @server_port) {|http|
-      http.get(url + "?t=json")
-    }
-    res.value
-
-    info = JSON.parse(res.body)
-    raise ArgumentError.new("Not a file") if info[0] == "dirnode"
-
-    info[1]["size"]
+  class File < Object
   end
 
-  def list_paths_starting_with(prefix)
-    parent = prefix[0..prefix.rindex('/')]
+  class Directory < Object
 
-    paths = []
-    begin
-      list_directory(parent).each { |name|
-        path = parent + name
+    def put_file(path, contents)
+      url = build_path_url(path)
+      put_file_url(url, contents)
+    end
 
-        if(path.start_with? prefix)
-          paths << path
-          if(path.end_with? "/")
-            list_paths_starting_with(path).each { |path|
-              paths << path
-            }
-          end
+    def put_file_url(url, contents)
+      fileid = nil
+      Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+        headers = {'Content-Type' => 'application/octet-stream'}
+        response = http.send_request('PUT', url, contents, headers)
+        response.value
+        fileid = response.body
+      end
+    fileid
+    end
+
+    def get_file(path)
+      get_file_url(build_path_url(path))
+    end
+
+    def get_file_url(url)
+      res = Net::HTTP.start(@server_url.host, @server_url.port) {|http|
+        http.get(url)
+      }
+      raise NotFoundError if res.code == "404"
+      raise NotFoundError if res.code == "301"
+      raise NotFoundError if res.code == "300"
+      res.value
+      res.body
+    end
+
+    def build_path_url(path)
+      url = "/uri/" + cap + URI.escape(path)
+      # singlify any double slashes
+      url.sub(/\/\//, '/')
+    end
+
+    def mkdir(path)
+      realpath = (path.end_with?("/") ? path.chop : path)
+      res = Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+        http.post(build_path_url(realpath) + "?t=mkdir", nil)
+      end
+      raise ArgumentError.new("Directory exists") if res.code == "400"
+      res.value
+      res.body
+    end
+
+    def list_directory(path)
+      url = build_path_url(path)
+      list_directory_url(url)
+    end
+
+    def list_directory_url(url)
+      res = Net::HTTP.start(@server_url.host, @server_url.port) {|http|
+        http.get("#{url}?t=json")
+      }
+      raise NotFoundError if res.code == "404"
+      res.value
+      json_info = res.body
+
+      directory_info = JSON.parse(json_info)
+
+      raise ArgumentError.new("Not a directory") unless directory_info[0] == "dirnode"
+
+      entries = []
+
+      directory_info[1]["children"].each_key { |filename|
+        if directory_info[1]["children"][filename][0] == "dirnode"
+          entries << (filename + "/")
+        else
+          entries << filename
         end
       }
-    rescue NotFoundError
-      # we can validly have no matching directories
+
+      entries
     end
 
-    paths
+    def delete(path)
+      url = build_path_url(path)
+
+      Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+        response = http.send_request('DELETE', url)
+        raise NotFoundError if response.code == "404"
+        raise NotFoundError if response.code == "301"
+        raise NotFoundError if response.code == "300"
+        response.value
+      end
+    end
+
+    # this adds a new hardlink and removes the old one
+    def rename(oldpath, newpath)
+      # make sure you're not renaming a parent directory underneath itself
+      raise ArgumentError.new("Cannot rename a parent into a child of itself") if newpath.start_with?(oldpath) && newpath[oldpath.length-1] == 47 #'/'
+
+      # get the old cap URI
+      url = build_path_url(oldpath)
+      res = Net::HTTP.start(@server_url.host, @server_url.port) {|http|
+        http.get(url + "?t=json")
+      }
+      res.value
+
+      info = JSON.parse(res.body)
+      if info[0] == "dirnode"
+        cap = info[1]["rw_uri"]
+      else
+        cap = info[1]["ro_uri"]
+      end
+
+      url = build_path_url(newpath)
+      url.chop! while url.end_with?("/")
+
+      # add the new link
+      Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+        headers = {'Content-Type' => 'text/plain'}
+        response = http.send_request('PUT', url + "?t=uri", cap, headers)
+        response.value # you get a 500 server error if you try to destructively rename over a directory
+      end
+
+      # then remove the old
+      delete(oldpath)
+    end
+
+    def get_size(path)
+      url = build_path_url(path)
+      res = Net::HTTP.start(@server_url.host, @server_url.port) {|http|
+        http.get(url + "?t=json")
+      }
+      res.value
+
+      info = JSON.parse(res.body)
+      raise ArgumentError.new("Not a file") if info[0] == "dirnode"
+
+      info[1]["size"]
+    end
+
+  def list_paths_starting_with(prefix)
+      parent = prefix[0..prefix.rindex('/')]
+
+      paths = []
+      begin
+        list_directory(parent).each { |name|
+          path = parent + name
+
+          if(path.start_with? prefix)
+            paths << path
+            if(path.end_with? "/")
+              list_paths_starting_with(path).each { |path|
+                paths << path
+              }
+            end
+          end
+        }
+      rescue NotFoundError
+        # we can validly have no matching directories
+      end
+
+      paths
+    end
+
   end
+
 end
 
 # vim:softtabstop=2:shiftwidth=2

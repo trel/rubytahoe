@@ -29,8 +29,6 @@
 require 'test/unit'
 require 'rubytahoe'
 
-TahoeRootWriteCap = "URI:DIR2:ufut6px6n764nvk2beejmox3py:qapbsyr6264puzv62l4nwpeqcec4uel2mgzmsv22ws54rofhr7ja"
-
 # fill in your username, password, and valid Root URI to test the Root URI retrieval code
 AllMyDataUsername = ""
 AllMyDataPassword = ""
@@ -38,30 +36,14 @@ AllMyDataURI = ""
 
 class TestRubyTahoe < Test::Unit::TestCase
   def setup
-    @client = RubyTahoe.new(TahoeServer, TahoeRootWriteCap)
-
-    empty_directory
-  end
-
-  def teardown
-    empty_directory
-    @client = nil
-  end
-
-  # clean out the test directory on the tahoe server
-  def empty_directory
-    items = @client.list_directory("/")
-    items.each { |key|
-      @client.delete("/" + key)
-    }
-
-    items = @client.list_directory("/")
-    assert_equal(0, items.length)
+    @client = RubyTahoe::Directory.new TahoeServer
   end
 
   def test_allmydata_auth
-    root_uri = RubyTahoe.get_allmydata_root_uri(AllMyDataUsername, AllMyDataPassword)
-    assert_equal(AllMyDataURI, root_uri)
+    unless AllMyDataURI.empty?
+      root_uri = RubyTahoe.get_allmydata_root_uri(AllMyDataUsername, AllMyDataPassword)
+      assert_equal(AllMyDataURI, root_uri)
+    end
 
     root_uri = RubyTahoe.get_allmydata_root_uri(AllMyDataUsername, AllMyDataPassword + "laksjflkajsdf")
     assert_nil(root_uri)

@@ -408,7 +408,7 @@ module RubyTahoe
 
     private
     def build_path_url(path)
-      url = "/uri/" + cap + URI.escape(path)
+      url = "/uri/#{cap}/#{URI.escape(path)}"
       # singlify any double slashes
       url.sub(/\/\//, '/')
     end

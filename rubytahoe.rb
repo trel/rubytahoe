@@ -54,6 +54,9 @@ end
 
 module RubyTahoe
 
+  class ReadOnlyError < RuntimeError
+  end
+
   def self.get_allmydata_root_uri(email, password)
     http = Net::HTTP.new("www.allmydata.com", 443)
     http.use_ssl = true
@@ -108,7 +111,7 @@ module RubyTahoe
     #
     # Returns true when the file is an immutable file.
     #
-    def immutable
+    def immutable?
       not @mutable
     end
 
@@ -234,7 +237,12 @@ module RubyTahoe
     # Returns true when the directory is empty.
     #
     def empty?
-      get_child_nodes.empty?
+      data = Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+        response, data = http.get "/uri/#{cap}?t=json"
+        data
+      end
+      data = JSON.parse data
+      data[1]["children"].empty?
     end
 
     #
@@ -266,6 +274,7 @@ module RubyTahoe
     # Attaches the given object or cap at the specified path
     #
     def []= path, object
+      raise ReadOnlyError unless writeable?
       add_cap = if object.respond_to? :cap
         object.cap
       else
@@ -309,6 +318,7 @@ module RubyTahoe
     # Creates a new directory at
     #
     def mkdir(path)
+      raise ReadOnlyError unless writeable?
       realpath = (path.end_with?("/") ? path.chop : path)
       res = Net::HTTP.start(@server_url.host, @server_url.port) do |http|
         http.post(build_path_url(realpath) + "?t=mkdir", nil)
@@ -385,6 +395,7 @@ module RubyTahoe
     # Deletes the element at path.
     #
     def delete path
+      raise ReadOnlyError unless writeable?
       Net::HTTP.start(@server_url.host, @server_url.port) do |http|
         response = http.send_request "DELETE", build_path_url(path)
         raise NotFoundError if response.code == "404"

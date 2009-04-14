@@ -195,15 +195,18 @@ module RubyTahoe
     end
 
     #
-    # Returns the size of a file. Please note, that for mutable files this
-    # means fetching the whole file and calculating the size of it, which can
-    # take a long time on big files.
+    # Returns the size of a file. As mutable files can change in size, their
+    # size needs to be re-fetched every time. This is done by issuing a HEAD
+    # request.
     #
     def size
       unless @size.nil?
         @size
       else
-        data.size
+        Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+          response = http.head "/uri/#{cap}"
+          response["Content-Length"].to_i
+        end
       end
     end
 

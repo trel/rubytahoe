@@ -34,7 +34,7 @@ AllMyDataUsername = ""
 AllMyDataPassword = ""
 AllMyDataURI = ""
 
-class TestRubyTahoe < Test::Unit::TestCase
+class TC_Legacy < Test::Unit::TestCase
   def setup
     @client = RubyTahoe::Directory.new TahoeServer
   end

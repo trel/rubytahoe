@@ -35,7 +35,7 @@ class TC_ReadOnly < Test::Unit::TestCase
         dir = @dir["non-empty"]
         assert_instance_of RubyTahoe::Directory, dir, "The directory is not what it seems to be"
         assert !dir.empty?, "The directory is empty"
-        assert_equal 0.upto(9).to_a.map{ |x| x.to_s }, dir.list_directory.sort, "The directory has the wrong files"
+        assert_equal Array.new(10) { |i| i.to_s }, dir.list_directory.sort, "The directory has the wrong files"
         control = [ ]
         dir.each do |name, object|
             control << name.to_i

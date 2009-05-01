@@ -178,6 +178,7 @@ module RubyTahoe
       server_url = URI.parse server_url unless server_url.is_a? URI::Generic
       data = Net::HTTP.start(server_url.host, server_url.port) do |http|
         headers = {"Content-Type" => "application/octet-stream"}
+        http.read_timeout = 7200
         response, data = if mutable
           http.send_request "PUT", "/uri?mutable=#{mutable}", data, headers
         else

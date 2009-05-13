@@ -319,17 +319,17 @@ module RubyTahoe
     end
 
     #
-    # Creates a new directory at
+    # Creates a new, empty directory at the specified path and returns the
+    # Directory object for the new directory.
     #
     def mkdir(path)
       raise ReadOnlyError unless writeable?
       realpath = (path.end_with?("/") ? path.chop : path)
-      res = Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+      response, data = Net::HTTP.start(@server_url.host, @server_url.port) do |http|
         http.post(build_path_url(realpath) + "?t=mkdir", nil)
       end
-      raise ArgumentError.new("Directory exists") if res.code == "400"
-      res.value
-      res.body
+      raise ArgumentError.new("Directory exists") if response.code == "400"
+      Object.new @server_url, data
     end
 
     #

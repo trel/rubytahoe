@@ -28,7 +28,6 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 require 'net/http'
-require 'net/https'
 require 'uri'
 require 'json/add/core'
 
@@ -58,6 +57,7 @@ module RubyTahoe
   end
 
   def self.get_allmydata_root_uri(email, password)
+    require "net/https"
     http = Net::HTTP.new("www.allmydata.com", 443)
     http.use_ssl = true
     http.verify_mode = OpenSSL::SSL::VERIFY_NONE # change this if you're concerned about MITM

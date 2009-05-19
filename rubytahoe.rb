@@ -166,6 +166,55 @@ module RubyTahoe
       @mutable = data["mutable"]
     end
 
+    #
+    # Checks the object and returns the results hash as documented at
+    # http://allmydata.org/source/tahoe/trunk/docs/frontends/webapi.txt in the
+    # "Debugging and Testing Features" section.
+    # If verify is true, every bit will be downloaded and verified.
+    # If add_lease is true, a/the lease will be added/renewed
+    #
+    def check verify = false, add_lease = false
+      data = Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+        http.read_timeout = 7200
+        response, data = http.post "/uri/#{cap}?t=check&verify=#{verify}&add-lease=#{add_lease}&output=JSON", nil
+        data
+      end
+      data = JSON.parse data
+      data["results"]
+    end
+
+    #
+    # Similar to check, this function tries to repair damaged files. It returns
+    # true on success, false in case of an error and nil if no repair was
+    # needed.
+    #
+    def repair! verify = false, add_lease = false
+      data = Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+        http.read_timeout = 7200
+        response, data = http.post "/uri/#{cap}?t=check&repair=true&verify=#{verify}&add-lease=#{add_lease}&output=JSON", nil
+        data
+      end
+      data = JSON.parse data
+      if data["repair-attempted"]
+        if data["repair_successful"]
+          true
+        else
+          false
+        end
+      else
+        nil
+      end
+    end
+
+    #
+    # Checks wheter an object is healthy or not
+    #
+    def healthy?
+      check()["healthy"]
+    end
+
+    alias :healthy! :repair!
+
   end
 
   class File < Object

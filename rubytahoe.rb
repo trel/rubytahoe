@@ -205,6 +205,7 @@ module RubyTahoe
         @size
       else
         Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+          http.read_timeout = 7200
           response = http.head "/uri/#{cap}"
           response["Content-Length"].to_i
         end
@@ -216,6 +217,7 @@ module RubyTahoe
     #
     def data
       Net::HTTP.start(@server_url.host, @server_url.port) do |http|
+        http.read_timeout = 7200
         response, data = http.get "/uri/#{cap}"
         data
       end

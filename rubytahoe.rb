@@ -207,7 +207,7 @@ module RubyTahoe
     end
 
     #
-    # Checks wheter an object is healthy or not
+    # Checks whether an object is healthy or not
     #
     def healthy?
       check()["healthy"]

@@ -137,7 +137,7 @@ class TC_Write < Test::Unit::TestCase
         # Verify that the directory is empty again
         assert dir.empty?, "The directory is not empty"
         dir.each do |name, object|
-            flunk "THe directory contains children"
+            flunk "The directory contains children"
         end
     end
 

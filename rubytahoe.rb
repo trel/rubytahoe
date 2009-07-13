@@ -132,7 +132,7 @@ module RubyTahoe
     # depending on the given cap.
     #
     def self.new server_url, cap = nil
-      return Directory.new server_url if cap.nil?
+      return (Directory.new server_url) if cap.nil?
       server_url = URI.parse server_url unless server_url.is_a? URI::Generic
       data = Net::HTTP.start(server_url.host, server_url.port) do |http|
         response, data = http.get "/uri/#{cap}?t=json"
@@ -140,7 +140,7 @@ module RubyTahoe
         data
       end
       data = JSON.parse(data)
-      return self.from_json server_url, data
+      return (self.from_json server_url), data
     end
 
     #
@@ -357,7 +357,7 @@ module RubyTahoe
     #
     def get_size path
       file = self[path]
-      raise ArgumentError.new "Not a file" unless file.is_a? File
+      raise (ArgumentError.new "Not a file") unless file.is_a? File
       file.size
     end
 
@@ -408,7 +408,7 @@ module RubyTahoe
       else
         dir = self[path]
       end
-      raise ArgumentError.new "Not a directory" unless dir.is_a? Directory
+      raise (ArgumentError.new "Not a directory") unless dir.is_a? Directory
       children = []
       dir.each do |name, child|
         name += "/" if child.is_a? Directory
